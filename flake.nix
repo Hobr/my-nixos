@@ -56,11 +56,47 @@
       self,
       nixpkgs,
       flakelight,
+      home-manager,
       ...
     }:
-    flakelight ./. {
-      imports = [ ];
+    let
+      mkNixosSystem =
+        hostname: system:
+        nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = { inherit inputs; };
+          modules = [
+            # 导入所有 NixOS 模块
+            ./modules/nixos
 
+            # 导入 Home Manager
+            home-manager.nixosModules.home-manager
+            {
+              home-manager.useGlobalPkgs = true;
+              home-manager.useUserPackages = true;
+              home-manager.extraSpecialArgs = { inherit inputs; };
+              home-manager.sharedModules = [ ./modules/home ];
+            }
+
+            # 导入主机配置
+            ./hosts/${hostname}
+          ];
+        };
+    in
+    flakelight ./. {
       inherit inputs;
+
+      systems = [
+        "x86_64-linux"
+      ];
+
+      outputs.nixosConfigurations = {
+        # 笔记本
+        kanade = mkNixosSystem "kanade" "x86_64-linux";
+        # 服务器
+        yuzuru = mkNixosSystem "yuzuru" "x86_64-linux";
+      };
+
+      formatters."*.nix" = "nixfmt";
     };
 }
